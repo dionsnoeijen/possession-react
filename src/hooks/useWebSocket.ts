@@ -182,6 +182,15 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
     }
   }, []);
 
+  const sendNavigation = useCallback(
+    (view: string, params?: Record<string, string>) => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: "navigate", view, params }));
+      }
+    },
+    []
+  );
+
   return {
     connected,
     chat,
@@ -198,5 +207,6 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
     reconnect: doConnect,
     sendMessage,
     sendTypedMessage,
+    sendNavigation,
   };
 }

@@ -2,6 +2,12 @@
   "name": "possession-react",
   "version": "0.1.0",
   "description": "AI takes control of your UI. React components for possession-powered apps.",
+  "license": "MIT",
+  "author": "Dion Snoeijen",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dionsnoeijen/possession-react.git"
+  },
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",

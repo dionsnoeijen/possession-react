@@ -39,17 +39,22 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
     const message = JSON.parse(event.data);
 
     switch (message.type) {
-      case "chat":
+      case "chat": {
+        // Capture previous streaming state BEFORE updating
+        const wasStreaming = streamingRef.current;
         setStreaming(true);
         streamingRef.current = true;
         setChat((prev) => {
           const last = prev[prev.length - 1];
-          if (last?.role === "assistant" && streamingRef.current) {
+          if (last?.role === "assistant" && wasStreaming) {
+            // Continue appending to the current streaming message
             return [...prev.slice(0, -1), { ...last, content: last.content + message.content }];
           }
+          // Start a new assistant message
           return [...prev, { role: "assistant", content: message.content }];
         });
         break;
+      }
 
       case "chat_end":
         setStreaming(false);
@@ -57,9 +62,38 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
         setChat((prev) => {
           const last = prev[prev.length - 1];
           if (last?.role === "assistant") {
-            return [...prev.slice(0, -1), { role: "assistant", content: message.content }];
+            return [
+              ...prev.slice(0, -1),
+              { ...last, content: message.content },
+            ];
           }
           return prev;
+        });
+        break;
+
+      case "tool_call":
+        // Only show completed tool calls as badges.
+        if (message.status !== "completed") break;
+        setChat((prev) => {
+          const last = prev[prev.length - 1];
+          const toolCall = {
+            name: message.name,
+            label: message.label,
+            icon: message.icon as string | undefined,
+            status: "completed" as const,
+          };
+          // Attach to the current assistant message, or create a placeholder
+          // one if tools fire before any text content arrives.
+          if (last?.role === "assistant") {
+            return [
+              ...prev.slice(0, -1),
+              { ...last, toolCalls: [...(last.toolCalls ?? []), toolCall] },
+            ];
+          }
+          return [
+            ...prev,
+            { role: "assistant", content: "", toolCalls: [toolCall] },
+          ];
         });
         break;
 

@@ -20,9 +20,17 @@ export interface RenderedComponent {
   props: Record<string, unknown>;
 }
 
+export interface ToolCall {
+  name: string;
+  label: string;
+  status: "started" | "completed";
+  icon?: string;
+}
+
 export interface ChatEntry {
   role: "user" | "assistant";
   content: string;
+  toolCalls?: ToolCall[];
 }
 
 export interface NavigateEvent {

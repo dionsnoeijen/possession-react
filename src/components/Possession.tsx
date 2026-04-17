@@ -155,7 +155,7 @@ export function Possession({
             zIndex: 10,
           }}
         >
-          <span style={{ fontSize: "1rem", color: "#e4e4e7" }}>
+          <span style={{ fontSize: "1rem", color: "#27272a" }}>
             <TypewriterValue
               value={overlay.value}
               onComplete={() => {

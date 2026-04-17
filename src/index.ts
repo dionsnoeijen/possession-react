@@ -1,10 +1,21 @@
 // Hooks
-export { useWebSocket, usePossession, useFormFill } from "./hooks";
-export type { UseWebSocketOptions, UseFormFillOptions } from "./hooks";
+export {
+  useWebSocket,
+  usePossession,
+  useFormFill,
+  useSpeechInput,
+  useSpeechOutput,
+} from "./hooks";
+export type {
+  UseWebSocketOptions,
+  UseFormFillOptions,
+  UseSpeechInputOptions,
+  UseSpeechOutputOptions,
+} from "./hooks";
 
 // Components
 export { Chat, UIRenderer, PossessionZone, Possession, TypewriterValue } from "./components";
-export type { ChatProps, PossessionZoneProps } from "./components";
+export type { ChatProps, ChatVoiceOptions, PossessionZoneProps } from "./components";
 
 // Context
 export { PossessionProvider, usePossessionContext } from "./context";

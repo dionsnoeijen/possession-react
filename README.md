@@ -258,6 +258,8 @@ The `Chat` component renders assistant messages as markdown (with GFM for tables
 <Chat
   messages={ws.chat}
   streaming={ws.streaming}
+  waiting={ws.waiting}
+  activeTools={ws.activeTools}
   connected={ws.connected}
   onSend={ws.sendMessage}
   onReconnect={ws.reconnect}
@@ -271,11 +273,17 @@ The `Chat` component renders assistant messages as markdown (with GFM for tables
 />
 ```
 
+Extra props for richer feedback:
+
+- `waiting` — user sent a message but nothing has come back yet. Shows bouncing dots immediately instead of leaving the chat silent.
+- `activeTools` — tools that have started but not yet completed. Rendered as pending badges with spinners; disappear when the tool completes and the normal completed badge takes over.
+- `hideToolBadges` — suppress both completed and pending tool badges in the chat. Useful when you render tool activity elsewhere (e.g. a dedicated activity stream in the main view) and want the chat to show only messages.
+
 ## Hooks
 
 | Hook | Purpose |
 |------|---------|
-| `useWebSocket(url, options?)` | Connect to the possession backend. Options: `token`, `onUnauthorized`, `onCustomMessage`. |
+| `useWebSocket(url, options?)` | Connect to the possession backend. Options: `token`, `onUnauthorized`, `onCustomMessage`. Returns `connected`, `chat`, `streaming`, `waiting`, `activeTools`, `reasoning`, `components`, `pendingNavigate`, `viewData`, `formFillQueue`, `highlightItemId`, plus senders (`sendMessage`, `sendNavigation`, `sendTypedMessage`) and reconnect. |
 | `useFormFill(options)` | Process the form fill queue |
 | `usePossession(duration)` | Track highlight states for navigation and actions |
 

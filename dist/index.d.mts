@@ -86,6 +86,14 @@ declare function useWebSocket(url: string, options?: UseWebSocketOptions): {
     connected: boolean;
     chat: ChatEntry[];
     streaming: boolean;
+    waiting: boolean;
+    activeTools: {
+        key: string;
+        name: string;
+        label: string;
+        icon?: string;
+    }[];
+    reasoning: string;
     components: RenderedComponent[];
     pendingNavigate: NavigateEvent | null;
     clearPendingNavigate: () => void;
@@ -202,6 +210,12 @@ interface ChatVoiceOptions {
     voice?: string;
 }
 type ChatTheme = "light" | "dark";
+interface ChatActiveTool {
+    key: string;
+    name: string;
+    label: string;
+    icon?: string;
+}
 interface ChatProps {
     messages: ChatEntry[];
     streaming: boolean;
@@ -218,8 +232,14 @@ interface ChatProps {
     theme?: ChatTheme;
     /** Map icon names (from @possession_tool(icon=...)) to ReactNodes. */
     iconMap?: Record<string, React.ReactNode>;
+    /** Tools currently running (from useWebSocket.activeTools). */
+    activeTools?: ChatActiveTool[];
+    /** Waiting for agent response (user sent, nothing back yet). */
+    waiting?: boolean;
+    /** Hide inline completed-tool badges on assistant messages. */
+    hideToolBadges?: boolean;
 }
-declare function Chat({ messages, streaming, connected, onSend, onReconnect, toolLabels, placeholder, emptyMessage, sendLabel, disconnectedMessage, voice, showStatus, theme, iconMap, }: ChatProps): react_jsx_runtime.JSX.Element;
+declare function Chat({ messages, streaming, connected, onSend, onReconnect, toolLabels, placeholder, emptyMessage, sendLabel, disconnectedMessage, voice, showStatus, theme, iconMap, activeTools, waiting, hideToolBadges, }: ChatProps): react_jsx_runtime.JSX.Element;
 
 interface UIRendererProps {
     component: RenderedComponent;

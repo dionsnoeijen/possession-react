@@ -40,6 +40,9 @@ function useWebSocket(url, options) {
   const [viewData, setViewData] = useState(null);
   const [formFillQueue, setFormFillQueue] = useState([]);
   const [highlightItemId, setHighlightItemId] = useState(null);
+  const [activeTools, setActiveTools] = useState([]);
+  const [waiting, setWaiting] = useState(false);
+  const [reasoning, setReasoning] = useState("");
   const handleMessageRef = useRef((event) => {
     var _a;
     const message = JSON.parse(event.data);
@@ -47,6 +50,7 @@ function useWebSocket(url, options) {
       case "chat": {
         const wasStreaming = streamingRef.current;
         setStreaming(true);
+        setWaiting(false);
         streamingRef.current = true;
         setChat((prev) => {
           const last = prev[prev.length - 1];
@@ -57,8 +61,18 @@ function useWebSocket(url, options) {
         });
         break;
       }
+      case "reasoning":
+        setWaiting(false);
+        setReasoning((prev) => {
+          var _a2;
+          return prev + ((_a2 = message.content) != null ? _a2 : "");
+        });
+        break;
       case "chat_end":
         setStreaming(false);
+        setWaiting(false);
+        setActiveTools([]);
+        setReasoning("");
         streamingRef.current = false;
         setChat((prev) => {
           const last = prev[prev.length - 1];
@@ -71,8 +85,31 @@ function useWebSocket(url, options) {
           return prev;
         });
         break;
-      case "tool_call":
-        if (message.status !== "completed") break;
+      case "tool_call": {
+        if (message.status === "started") {
+          setWaiting(false);
+          setActiveTools((prev) => {
+            var _a2;
+            return [
+              ...prev,
+              {
+                key: `${message.name}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                name: message.name,
+                label: message.label,
+                icon: message.icon,
+                args: (_a2 = message.args) != null ? _a2 : void 0
+              }
+            ];
+          });
+          break;
+        }
+        setActiveTools((prev) => {
+          const idx = prev.findIndex((t) => t.name === message.name);
+          if (idx === -1) return prev;
+          const next = [...prev];
+          next.splice(idx, 1);
+          return next;
+        });
         setChat((prev) => {
           var _a2;
           const last = prev[prev.length - 1];
@@ -94,6 +131,7 @@ function useWebSocket(url, options) {
           ];
         });
         break;
+      }
       case "ui_action":
         if (message.action === "navigate") {
           setPendingNavigate({ view: message.view, params: message.params });
@@ -193,6 +231,7 @@ function useWebSocket(url, options) {
     var _a;
     if (((_a = wsRef.current) == null ? void 0 : _a.readyState) === WebSocket.OPEN) {
       setChat((prev) => [...prev, { role: "user", content: message }]);
+      setWaiting(true);
       wsRef.current.send(JSON.stringify({ message }));
     }
   }, []);
@@ -215,6 +254,9 @@ function useWebSocket(url, options) {
     connected,
     chat,
     streaming,
+    waiting,
+    activeTools,
+    reasoning,
     components: Array.from(components.values()),
     pendingNavigate,
     clearPendingNavigate: useCallback(() => setPendingNavigate(null), []),
@@ -511,7 +553,10 @@ function Chat({
   voice,
   showStatus = true,
   theme = "dark",
-  iconMap
+  iconMap,
+  activeTools = [],
+  waiting = false,
+  hideToolBadges = false
 }) {
   var _a;
   const [input, setInput] = useState6("");
@@ -602,7 +647,7 @@ function Chat({
           return /* @__PURE__ */ jsx("div", { className: "flex justify-end", children: /* @__PURE__ */ jsx("div", { className: `max-w-[90%] rounded-2xl px-4 py-3 text-base shadow-sm ${t.userBubble}`, children: msg.content }) }, i);
         }
         return /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-1.5 items-start", children: [
-          ((_a2 = msg.toolCalls) != null ? _a2 : []).map((tc, k) => {
+          !hideToolBadges && ((_a2 = msg.toolCalls) != null ? _a2 : []).map((tc, k) => {
             var _a3, _b;
             const label = (_b = (_a3 = allToolLabels[tc.name]) != null ? _a3 : tc.label) != null ? _b : tc.name;
             const icon = tc.icon && (iconMap == null ? void 0 : iconMap[tc.icon]);
@@ -621,7 +666,24 @@ function Chat({
           msg.content.trim() && /* @__PURE__ */ jsx("div", { className: `max-w-[95%] rounded-2xl px-4 py-3 ${t.assistantBubble}`, children: /* @__PURE__ */ jsx("div", { className: t.assistantProse, children: /* @__PURE__ */ jsx(ReactMarkdown, { remarkPlugins: [remarkGfm], children: msg.content }) }) })
         ] }, i);
       }),
-      streaming && /* @__PURE__ */ jsx("div", { className: "flex justify-start", children: /* @__PURE__ */ jsx("div", { className: `rounded-2xl px-4 py-3 ${t.streamingDots}`, children: /* @__PURE__ */ jsxs("div", { className: "flex gap-1.5", children: [
+      !hideToolBadges && activeTools.length > 0 && /* @__PURE__ */ jsx("div", { className: "flex flex-col gap-1.5 items-start", children: activeTools.map((tool) => {
+        const icon = tool.icon && (iconMap == null ? void 0 : iconMap[tool.icon]);
+        return /* @__PURE__ */ jsxs(
+          "div",
+          {
+            className: `flex items-center gap-2 text-xs rounded-lg px-2.5 py-1 ${t.toolBadge}`,
+            children: [
+              icon ? /* @__PURE__ */ jsx("span", { className: "inline-flex w-3.5 h-3.5 items-center justify-center", children: icon }) : /* @__PURE__ */ jsxs("svg", { className: "animate-spin w-3 h-3", viewBox: "0 0 24 24", fill: "none", children: [
+                /* @__PURE__ */ jsx("circle", { cx: "12", cy: "12", r: "10", stroke: "currentColor", strokeOpacity: "0.25", strokeWidth: "3" }),
+                /* @__PURE__ */ jsx("path", { d: "M12 2a10 10 0 0 1 10 10", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round" })
+              ] }),
+              tool.label
+            ]
+          },
+          tool.key
+        );
+      }) }),
+      (streaming || waiting || activeTools.length > 0) && /* @__PURE__ */ jsx("div", { className: "flex justify-start", children: /* @__PURE__ */ jsx("div", { className: `rounded-2xl px-4 py-3 ${t.streamingDots}`, children: /* @__PURE__ */ jsxs("div", { className: "flex gap-1.5", children: [
         /* @__PURE__ */ jsx("span", { className: `w-2 h-2 rounded-full animate-bounce [animation-delay:0ms] ${t.streamingDot}` }),
         /* @__PURE__ */ jsx("span", { className: `w-2 h-2 rounded-full animate-bounce [animation-delay:150ms] ${t.streamingDot}` }),
         /* @__PURE__ */ jsx("span", { className: `w-2 h-2 rounded-full animate-bounce [animation-delay:300ms] ${t.streamingDot}` })

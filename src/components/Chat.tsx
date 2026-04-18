@@ -17,6 +17,13 @@ export interface ChatVoiceOptions {
 
 export type ChatTheme = "light" | "dark";
 
+export interface ChatActiveTool {
+  key: string;
+  name: string;
+  label: string;
+  icon?: string;
+}
+
 export interface ChatProps {
   messages: ChatEntry[];
   streaming: boolean;
@@ -33,6 +40,12 @@ export interface ChatProps {
   theme?: ChatTheme;
   /** Map icon names (from @possession_tool(icon=...)) to ReactNodes. */
   iconMap?: Record<string, React.ReactNode>;
+  /** Tools currently running (from useWebSocket.activeTools). */
+  activeTools?: ChatActiveTool[];
+  /** Waiting for agent response (user sent, nothing back yet). */
+  waiting?: boolean;
+  /** Hide inline completed-tool badges on assistant messages. */
+  hideToolBadges?: boolean;
 }
 
 const DEFAULT_TOOL_LABELS: Record<string, string> = {
@@ -97,6 +110,9 @@ export function Chat({
   showStatus = true,
   theme = "dark",
   iconMap,
+  activeTools = [],
+  waiting = false,
+  hideToolBadges = false,
 }: ChatProps) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -208,7 +224,7 @@ export function Chat({
 
           return (
             <div key={i} className="flex flex-col gap-1.5 items-start">
-              {(msg.toolCalls ?? []).map((tc, k) => {
+              {!hideToolBadges && (msg.toolCalls ?? []).map((tc, k) => {
                 const label = allToolLabels[tc.name] ?? tc.label ?? tc.name;
                 const icon = tc.icon && iconMap?.[tc.icon];
                 return (
@@ -237,7 +253,32 @@ export function Chat({
             </div>
           );
         })}
-        {streaming && (
+        {!hideToolBadges && activeTools.length > 0 && (
+          <div className="flex flex-col gap-1.5 items-start">
+            {activeTools.map((tool) => {
+              const icon = tool.icon && iconMap?.[tool.icon];
+              return (
+                <div
+                  key={tool.key}
+                  className={`flex items-center gap-2 text-xs rounded-lg px-2.5 py-1 ${t.toolBadge}`}
+                >
+                  {icon ? (
+                    <span className="inline-flex w-3.5 h-3.5 items-center justify-center">
+                      {icon}
+                    </span>
+                  ) : (
+                    <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+                      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                    </svg>
+                  )}
+                  {tool.label}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {(streaming || waiting || activeTools.length > 0) && (
           <div className="flex justify-start">
             <div className={`rounded-2xl px-4 py-3 ${t.streamingDots}`}>
               <div className="flex gap-1.5">

@@ -34,6 +34,13 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
   const [viewData, setViewData] = useState<ViewDataEvent | null>(null);
   const [formFillQueue, setFormFillQueue] = useState<FormFillItem[]>([]);
   const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
+  // Tool calls currently running (started but not yet completed). Keyed so
+  // the same tool can be active multiple times concurrently if needed.
+  const [activeTools, setActiveTools] = useState<Array<{ key: string; name: string; label: string; icon?: string }>>([]);
+  // Waiting = user sent, nothing back yet (no assistant message, no tool activity).
+  const [waiting, setWaiting] = useState(false);
+  // Reasoning stream — model's thinking, cleared at chat_end.
+  const [reasoning, setReasoning] = useState<string>("");
 
   const handleMessageRef = useRef((event: MessageEvent) => {
     const message = JSON.parse(event.data);
@@ -43,6 +50,7 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
         // Capture previous streaming state BEFORE updating
         const wasStreaming = streamingRef.current;
         setStreaming(true);
+        setWaiting(false);
         streamingRef.current = true;
         setChat((prev) => {
           const last = prev[prev.length - 1];
@@ -56,8 +64,16 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
         break;
       }
 
+      case "reasoning":
+        setWaiting(false);
+        setReasoning((prev) => prev + (message.content ?? ""));
+        break;
+
       case "chat_end":
         setStreaming(false);
+        setWaiting(false);
+        setActiveTools([]);
+        setReasoning("");
         streamingRef.current = false;
         setChat((prev) => {
           const last = prev[prev.length - 1];
@@ -71,9 +87,29 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
         });
         break;
 
-      case "tool_call":
-        // Only show completed tool calls as badges.
-        if (message.status !== "completed") break;
+      case "tool_call": {
+        if (message.status === "started") {
+          setWaiting(false);
+          setActiveTools((prev) => [
+            ...prev,
+            {
+              key: `${message.name}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              name: message.name,
+              label: message.label,
+              icon: message.icon as string | undefined,
+              args: (message.args as Record<string, unknown> | undefined) ?? undefined,
+            },
+          ]);
+          break;
+        }
+        // completed: pop one matching active entry, then add completed badge.
+        setActiveTools((prev) => {
+          const idx = prev.findIndex((t) => t.name === message.name);
+          if (idx === -1) return prev;
+          const next = [...prev];
+          next.splice(idx, 1);
+          return next;
+        });
         setChat((prev) => {
           const last = prev[prev.length - 1];
           const toolCall = {
@@ -82,8 +118,6 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
             icon: message.icon as string | undefined,
             status: "completed" as const,
           };
-          // Attach to the current assistant message, or create a placeholder
-          // one if tools fire before any text content arrives.
           if (last?.role === "assistant") {
             return [
               ...prev.slice(0, -1),
@@ -96,6 +130,7 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
           ];
         });
         break;
+      }
 
       case "ui_action":
         if (message.action === "navigate") {
@@ -206,6 +241,7 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
   const sendMessage = useCallback((message: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       setChat((prev) => [...prev, { role: "user", content: message }]);
+      setWaiting(true);
       wsRef.current.send(JSON.stringify({ message }));
     }
   }, []);
@@ -229,6 +265,9 @@ export function useWebSocket(url: string, options?: UseWebSocketOptions) {
     connected,
     chat,
     streaming,
+    waiting,
+    activeTools,
+    reasoning,
     components: Array.from(components.values()),
     pendingNavigate,
     clearPendingNavigate: useCallback(() => setPendingNavigate(null), []),
